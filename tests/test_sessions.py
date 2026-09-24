@@ -34,7 +34,7 @@ class Sessions(Fixture):
                 contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
             code = cli.main(["hook", "--agent", agent])
         self.assertEqual(code, 0, err.getvalue())
-        return json.loads(out.getvalue()) if agent != "kimi" else out.getvalue()
+        return (json.loads(out.getvalue()) if out.getvalue().strip() else {}) if agent != "kimi" else out.getvalue()
 
     def snapshot(self, session="one", agent="codex"):
         state, _, _ = self.track("Stop", agent=agent, session=session)
@@ -150,7 +150,7 @@ class Sessions(Fixture):
         self.change(staged=False)
         for kwargs in ({}, {"session": None}):
             result = self.invoke("PostToolUse", **kwargs)
-            self.assertIn("未", result["systemMessage"])
+            self.assertIn("未", json.dumps(result, ensure_ascii=False))
             self.assertNotIn("decision", result)
         self.assertFalse(self.counter.exists())
 
@@ -252,4 +252,25 @@ class Sessions(Fixture):
         self.invoke("PostToolUse")
         self.assertEqual(self.invoke("Stop")["decision"], "block")
         self.assertNotIn("decision", self.invoke("Stop", stop_hook_active=True))
+        self.assertEqual(self.invoke("Stop"), {})
+        self.assertFalse(self.counter.exists())
+
+    def test_claude_cached_candidates_only_show_one_nonblocking_stop_summary(self):
+        self.invoke("PreToolUse", agent="claude")
+        self.change(staged=False)
+        report = {"changed": ["中文.md"], "exit_code": 1, "ai_review": "not_run",
+                  "findings": [{"severity": "REVIEW", "rule": "D004", "file": "中文.md",
+                                "line": n + 1, "message": "保真候选"} for n in range(23)]}
+        with patch.object(cli, "run_checks", return_value=report) as check:
+            self.assertEqual(self.invoke("PostToolUse", agent="claude"), {})
+            self.assertEqual(self.invoke("PostToolUse", agent="claude"), {})
+            summary = self.invoke("Stop", agent="claude")
+            self.assertEqual(set(summary), {"systemMessage"})
+            self.assertIn("23 REVIEW", summary["systemMessage"])
+            self.assertEqual(self.invoke("Stop", agent="claude"), {})
+            self.assertEqual(check.call_count, 1)
+        saved = read_json(home() / "reports" / (self.item["id"] + ".json"))
+        self.assertEqual(saved["findings"], report["findings"])
+        self.assertEqual(saved["exit_code"], 1)
+        self.assertEqual(saved["ai_review"], "not_run")
         self.assertFalse(self.counter.exists())

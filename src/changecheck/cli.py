@@ -17,7 +17,7 @@ from .repository import load_snapshot, repo_root
 from .review import (claude_command, codex_command, review_cache_enabled, reviewer_identity,
                      review_snapshot, validate_reviewer)
 from .context import attach_references
-from . import sessions, storage
+from . import feedback, sessions, storage
 from .project import CONFIG, FIELDS, MODULES, effective_profile, module_for, validate
 from .resources import complete_profile, require_resources, resource_issues, set_resource
 
@@ -383,11 +383,14 @@ def do_hook(args):
             raise CheckError("事件必须是对象")
         event_name = event.get("hook_event_name", event.get("hookEventName", "PostToolUse"))
         messages, checked = [], []
+        should_block = False
         warnings = []
         key = sessions.session_key(args.agent, event)
         if not key:
+            previous = read_json(home() / "events.json", {}).get(args.agent, {})
             record_event(args.agent, event_name, [], scope="unavailable", outcome="missing_session_id")
-            print(json.dumps({"systemMessage": "会话检查已跳过：事件缺少 session_id；未扫描仓库历史变动，请新开会话启用钩子。"}, ensure_ascii=False))
+            if previous.get("outcome") != "missing_session_id":
+                print(json.dumps({"systemMessage": "会话检查已跳过：事件缺少 session_id；未扫描仓库历史变动，请新开会话启用钩子。"}, ensure_ascii=False))
             return 0
         for item in roots():
             if args.agent not in item["profile"].get("agents", []):
@@ -407,7 +410,14 @@ def do_hook(args):
                               "scope_warnings": scope_warnings, "ai_review": "not_run"}
                     if state is not None:
                         state["cache"] = {"report": report}
+                        message, block = feedback.prepare(state, report, scope_warnings, event_name,
+                                                         bool(event.get("stop_hook_active", event.get("stopHookActive"))), state_file)
+                        if message:
+                            messages.append(message)
+                        should_block |= block
                         storage.save_artifact(state_file, state)
+                    elif scope_warnings:
+                        messages.append("change-check：" + feedback.compact("；".join(scope_warnings)))
                     # A root unrelated to the host cwd must not overwrite its previous report.
                     if ((state is not None and (state["files"] or state["warnings"] or state["uncertain"])) or
                             (event.get("cwd") and Path(event["cwd"]).resolve().is_relative_to(Path(item["path"]).resolve()))):
@@ -423,43 +433,23 @@ def do_hook(args):
                     report = run_checks(snap, item)
                 report["scope_warnings"] = scope_warnings
                 state["cache"] = {"key": cache_key, "report": report}
+                message, block = feedback.prepare(state, report, scope_warnings, event_name,
+                                                 bool(event.get("stop_hook_active", event.get("stopHookActive"))), state_file)
+                if message:
+                    messages.append(message)
+                should_block |= block
                 storage.save_artifact(state_file, state)
                 storage.save_artifact(home() / "reports" / (item["id"] + ".json"), report)
                 checked.append(item["id"])
-                for finding in report["findings"]:
-                    if finding["severity"] in ("ERROR", "REVIEW"):
-                        messages.append(f"{item['path']}/{finding['file']}:{finding['line']} "
-                                        f"{finding['severity']} {finding['rule']}: {finding['message']}")
         record_event(args.agent, event_name, checked, scope="session", session_key=key,
-                     outcome="checked" if checked else "scope_unavailable" if warnings else "tracked_or_skipped")
-        if not messages:
-            if warnings:
-                message = "会话范围提示（未扩大为全仓检查）：\n" + "\n".join(warnings[:10])
-                print(message if args.agent == "kimi" else json.dumps({"systemMessage": message}, ensure_ascii=False))
-            else:
-                print("{}" if args.agent != "kimi" else "")
-            return 0
-        message = "本会话修改文件的脚本检查待处理；仅修正本任务已授权内容：\n" + "\n".join(messages[:60])
-        if warnings:
-            message += "\n会话范围提示：\n" + "\n".join(warnings[:10])
-        if len(messages) > 60:
-            message += "\n更多问题见本机 change-check/reports，不表示检查通过。"
-        if args.agent == "kimi":
-            if event_name == "Stop" and not event.get("stop_hook_active"):
-                print(message, file=sys.stderr)
-                return 2
-            print(message)
-            return 0
-        if event_name == "Stop" and not event.get("stop_hook_active"):
-            print(json.dumps({"decision": "block", "reason": message}, ensure_ascii=False))
-            return 0
-        if event_name == "Stop":
-            print(json.dumps({"systemMessage": message}, ensure_ascii=False))
-            return 0
-        print(json.dumps({"hookSpecificOutput": {"hookEventName": event_name,
-                                                 "additionalContext": message}},
-                         ensure_ascii=False))
-        return 0
+                     outcome="checked" if checked else "scope_unavailable" if warnings else "tracked_or_skipped",
+                     feedback="blocked_once" if should_block else "summary" if messages else "silent")
+        code, output, error = feedback.render(args.agent, event_name, "\n".join(messages), should_block)
+        if output:
+            print(output)
+        if error:
+            print(error, file=sys.stderr)
+        return code
     except (CheckError, ValueError, OSError) as exc:
         print("变更检查未完成：" + str(exc), file=sys.stderr)
         return 2
