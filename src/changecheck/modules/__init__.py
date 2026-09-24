@@ -1,0 +1,1 @@
+"""Independent mandatory script checkers."""

@@ -1,0 +1,124 @@
+{
+  "format": 1,
+  "generated": true,
+  "transform": "public-markdown-v1",
+  "instructions": "Generated from original sources; edit originals and rebuild, not these copies.",
+  "files": {
+    "skills/firmware-detailed-design/SKILL.md": {
+      "source_sha256": "585d166d730ddb7b6f504c7c461989b21f02e85a4a86281a9f7a340df357e32f",
+      "sha256": "5c0ef6b3959980a451f052f6e86cbf9b2434a3323090b8f6744c171bbfaead1d"
+    },
+    "skills/firmware-detailed-design/references/content-review.md": {
+      "source_sha256": "aeba822d2f2c025ae4c77a7e990e17d0e536080f0df23c1bde59657cbea44a0a",
+      "sha256": "aeba822d2f2c025ae4c77a7e990e17d0e536080f0df23c1bde59657cbea44a0a"
+    },
+    "skills/firmware-detailed-design/references/format-validation.md": {
+      "source_sha256": "0776129e423fa2aae5a4411020ade2ce9e4fe08e91c5e42278fc3ac6e5d1b1c4",
+      "sha256": "0776129e423fa2aae5a4411020ade2ce9e4fe08e91c5e42278fc3ac6e5d1b1c4"
+    },
+    "skills/firmware-detailed-design/references/review-checklist.md": {
+      "source_sha256": "779c3b8a15b39242ff37817c2fff7a614ff1a5e3b453acd18e8e42e3db36846d",
+      "sha256": "779c3b8a15b39242ff37817c2fff7a614ff1a5e3b453acd18e8e42e3db36846d"
+    },
+    "skills/firmware-detailed-design/scripts/validate_detailed_design_boundaries.py": {
+      "source_sha256": "01d5e32256d98c4ace5ba947e1578700402cc6b71953f813a1ffa8f6534fa57f",
+      "sha256": "01d5e32256d98c4ace5ba947e1578700402cc6b71953f813a1ffa8f6534fa57f"
+    },
+    "skills/firmware-detailed-design/scripts/validate_detailed_design_content.py": {
+      "source_sha256": "cfc212834d0c092896a600bc002e89dfc90a47bf4c95593d91967a80744977c3",
+      "sha256": "cfc212834d0c092896a600bc002e89dfc90a47bf4c95593d91967a80744977c3"
+    },
+    "skills/firmware-detailed-design/scripts/validate_detailed_design_format.py": {
+      "source_sha256": "2fe58c0512f875802c142fbcd31df7d5a2f3f6ae328da80f50a8259ee1372893",
+      "sha256": "2fe58c0512f875802c142fbcd31df7d5a2f3f6ae328da80f50a8259ee1372893"
+    },
+    "skills/firmware-detailed-design/scripts/validate_detailed_design_frontmatter.py": {
+      "source_sha256": "d0446e4fd5421c93e6dd46576b8539c9ce67b202ab899dffbaeb459ee8250076",
+      "sha256": "d0446e4fd5421c93e6dd46576b8539c9ce67b202ab899dffbaeb459ee8250076"
+    },
+    "skills/firmware-detailed-design/scripts/validate_detailed_design_prose.py": {
+      "source_sha256": "3cbdebcd7ca6a60300c1aa5992400fc935847b9a42856c3e4b5c30f0bd4cd20a",
+      "sha256": "3cbdebcd7ca6a60300c1aa5992400fc935847b9a42856c3e4b5c30f0bd4cd20a"
+    },
+    "skills/firmware-detailed-design/scripts/validate_detailed_design_struct_comments.py": {
+      "source_sha256": "1661a31a11f8de85e901de64ee47f87ab295ccd768ec79a0b69fe8031d258ca4",
+      "sha256": "1661a31a11f8de85e901de64ee47f87ab295ccd768ec79a0b69fe8031d258ca4"
+    },
+    "skills/firmware-detailed-design/scripts/validate_diagram_labels.py": {
+      "source_sha256": "4a6d532c8d315c227da50eb3d1b63c27b29e63437d29c6b55772689316e606df",
+      "sha256": "4a6d532c8d315c227da50eb3d1b63c27b29e63437d29c6b55772689316e606df"
+    },
+    "skills/knowledge-compiler/SKILL.md": {
+      "source_sha256": "a61ada3f70dc8a09395f775aad23f10af22cf224488ab27872b7e4e208803a40",
+      "sha256": "a61ada3f70dc8a09395f775aad23f10af22cf224488ab27872b7e4e208803a40"
+    },
+    "skills/knowledge-compiler/references/compile-index.md": {
+      "source_sha256": "380394d49aa9f1a1f6c33a0299daaccae32652b52f2d2e451929044ab818c275",
+      "sha256": "380394d49aa9f1a1f6c33a0299daaccae32652b52f2d2e451929044ab818c275"
+    },
+    "skills/knowledge-compiler/references/templates.md": {
+      "source_sha256": "3b3aa161b1bc68a9c35cd6c4581c8947ec0ef7c81c6eb0b06a86c6d24201714b",
+      "sha256": "3b3aa161b1bc68a9c35cd6c4581c8947ec0ef7c81c6eb0b06a86c6d24201714b"
+    },
+    "skills/knowledge-compiler/references/workflow.md": {
+      "source_sha256": "11c0b19341224523130897cae4cfef108a409d8d7ab335636aca72ac558a4aaf",
+      "sha256": "11c0b19341224523130897cae4cfef108a409d8d7ab335636aca72ac558a4aaf"
+    },
+    "skills/obsidian-kb/SKILL.md": {
+      "source_sha256": "8a637ea1fe89e3e2c0ce3deae1eafbe1430754465a22df36e03717b22073776a",
+      "sha256": "5e971be1b14e6ccadd246ae9e6c9a68712665a94e9dbf5de6b8f17f6acb778db"
+    },
+    "skills/requirement-decomposition/SKILL.md": {
+      "source_sha256": "ee0f6675175b38132b3477e18570fa318a92999588a380f8b73e47a27723bdae",
+      "sha256": "ee0f6675175b38132b3477e18570fa318a92999588a380f8b73e47a27723bdae"
+    },
+    "skills/requirement-decomposition/references/method.md": {
+      "source_sha256": "82d97bba4c0520f8c5ec85ea140c794a2bf182c2b0e576459ce8f76047098800",
+      "sha256": "82d97bba4c0520f8c5ec85ea140c794a2bf182c2b0e576459ce8f76047098800"
+    },
+    "skills/requirement-decomposition/references/risk-analysis.md": {
+      "source_sha256": "22502ef556c435f049206a6853d844d1ede82dc2db0e5e4160dd09a16303ee6a",
+      "sha256": "22502ef556c435f049206a6853d844d1ede82dc2db0e5e4160dd09a16303ee6a"
+    },
+    "standards/AI使用规范.md": {
+      "source_sha256": "04a341c82559241ca634bf4e571407dc7cc710cae6e15dfce4d64b4a921169ad",
+      "sha256": "fe65f3b61d53b9bf53496ec2ee143939cf4369dfdf1c88aca66e289d4701441b"
+    },
+    "standards/Git版本迭代规范.md": {
+      "source_sha256": "5a6cf150bb3993ac465ff6135a5cdd92bd0c775f9df5b99c82b00e06ab182662",
+      "sha256": "2d6d8375972ef6950f14d7863916447086db35b8bf73572cf0c3adca5d80bee1"
+    },
+    "standards/frontmatter规范.md": {
+      "source_sha256": "574a5640fb820a1e3be53eea904074e22062c877e1d9b45b9eb088e852a08e30",
+      "sha256": "c6b21083a3203527aa392a7c89165f90af8ead900bc2a6650aabc73f29de5bdd"
+    },
+    "standards/双链规范.md": {
+      "source_sha256": "fe8e0737f9a4071eb69aebd1b59a2dbe9aaabec61afc7a310f9a9b376c23ce0d",
+      "sha256": "f7593f0697cfaf3f2b32ecf7eee109383244612329f4b96036a1d3dc53886622"
+    },
+    "standards/命名约定.md": {
+      "source_sha256": "11ef35bd0bef09596921083e8b800bb9f89a6dea87ddb7a9b777342c9e8c4f10",
+      "sha256": "a76e9ca47cdf97e9731581ca3aad79f925885a092d5464936d03f071a38d48ea"
+    },
+    "standards/图表规范.md": {
+      "source_sha256": "e5982e9a1ca2ebb78c08b139318d3cf9afb2e40949430ebe550d683672b08918",
+      "sha256": "62c08533f276d7d6507ff5ceb19249bcc53a74a721dece09224974e654db12ee"
+    },
+    "standards/层级架构规范.md": {
+      "source_sha256": "d304316ad7dea1864d87a5c8625be2ea9330e9de53b826d21ea2295e41ca32d7",
+      "sha256": "a5f7c938019b6ddae83b66409423e1905cc316c94393d41cfe28968ccd43c883"
+    },
+    "standards/文件大小规范.md": {
+      "source_sha256": "f5c0ab937d805abebeab6ded84333cecab4c15d42fd557066a833cda49c8cf29",
+      "sha256": "f7474d24b281c9d0150a2b8f93fe53ca93c23e06e9624d1502acc8c2122fc28d"
+    },
+    "templates/详设.md": {
+      "source_sha256": "0dc50de0d4242f07249e5ea61abfb38c8651d68b7a0b2e53a68e9dcf6b250ada",
+      "sha256": "36a2344eb178b8c22add3b4210420abeaa125c4759ab4c8d455af38038bc1e21"
+    },
+    "templates/需求.md": {
+      "source_sha256": "beaf6dd94a67c41e1d799a54ca03e4934f8a90d1becacf3b023396714a3e25ba",
+      "sha256": "aa3b9f124291e46222d02a33d09fadbb7030117d3d1be7f36e485fa64d915ad6"
+    }
+  }
+}

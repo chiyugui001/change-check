@@ -1,0 +1,2 @@
+# Keep release checksums and PowerShell UTF-8 BOM bytes stable across Git clients.
+* -text

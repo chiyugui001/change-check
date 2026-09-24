@@ -1,0 +1,10 @@
+{
+  "standards": "C:/work/my-project/公共知识库/知识库规范",
+  "templates": "C:/work/my-project/公共知识库/模板",
+  "skills": {
+    "obsidian-kb": "~/.codex/skills/obsidian-kb",
+    "knowledge-compiler": "~/.codex/skills/knowledge-compiler",
+    "requirement-decomposition": "~/.codex/skills/requirement-decomposition",
+    "firmware-detailed-design": "~/.codex/skills/firmware-detailed-design"
+  }
+}
