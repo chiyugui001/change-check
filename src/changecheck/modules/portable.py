@@ -57,7 +57,8 @@ def check(snap, policy):
                     executions.append({"checker": module, "file": name, "status": "requires_project_checker"})
                     continue
                 elif policy.get("code", {}).get("c_style", True):
-                    findings.extend(c_rules.check(name, text))
+                    from ..daily import local_lines
+                    findings.extend(c_rules.check(name, text, local_lines(snap, name, "C001")))
                 else:
                     add("CORE004", "C 文件必须启用内置规则；不能通过 c_style=false 跳过脚本检查")
             elif module == "config":

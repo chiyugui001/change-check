@@ -206,10 +206,12 @@ def task_links(snap, file, line):
 
 
 def writing_checks(snap, profile, texts, add):
+    from .daily import local_lines
     for name in sorted(snap.changed & texts.keys()):
         if not writing_document(name, profile):
             continue
         text = texts[name]
+        selected_lines = local_lines(snap, name, "WR001")
         try:
             meta, _ = frontmatter(text)
         except (ValueError, UnicodeError, yaml.YAMLError):
@@ -224,7 +226,7 @@ def writing_checks(snap, profile, texts, add):
         for line, raw in visible_lines(text)[0]:
             if raw.lstrip().startswith(">"):
                 continue
-            if re.search(r"用户(?:已)?确认\s*[：:]|用户已确认|暂按|暂定|先按", raw):
+            if (selected_lines is None or line in selected_lines) and re.search(r"用户(?:已)?确认\s*[：:]|用户已确认|暂按|暂定|先按", raw):
                 add(name, "WR001", "过程性或保留表述候选；核对是否应直接陈述已确认方案，保留真实前提与合法引用", "REVIEW", line)
             if re.search(r"待(?:确认|核对|测试|验证)|尚(?:需|未).{0,12}(?:确认|核对|测试|验证)|需(?!求)(?:要)?.{0,8}(?:实测|验证|核对)|未(?:完成|进行|执行).{0,8}(?:测试|验证)", raw):
                 links, problems = task_links(snap, name, line)
@@ -445,6 +447,7 @@ def generic_checks(snap, profile):
             old_target = resolve_link(name, target, all_names, wiki)[0]
             if name not in active and resolved not in snap.changed and old_target not in snap.changed:
                 continue
+            snap.checked_links.append([name, line])
             if resolved is None:
                 continue
             if error:

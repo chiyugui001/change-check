@@ -17,7 +17,7 @@ from .repository import load_snapshot, repo_root
 from .review import (claude_command, codex_command, review_cache_enabled, reviewer_identity,
                      review_snapshot, validate_reviewer)
 from .context import attach_references
-from . import feedback, sessions, storage
+from . import daily, feedback, sessions, storage
 from .project import CONFIG, FIELDS, MODULES, effective_profile, module_for, validate
 from .resources import complete_profile, require_resources, resource_issues, set_resource
 
@@ -399,7 +399,30 @@ def do_hook(args):
                 state, state_file, should_check = sessions.track(item, args.agent, event)
                 if not should_check:
                     continue
-                snap, scope_warnings = sessions.scoped_snapshot(item, state)
+                if event_name == "Stop" and state and not state.get("changes"):
+                    # The preceding write already ran its scripts. Questions must not
+                    # load a workspace snapshot, hash rules, or launch any checker.
+                    report = state.get("cache", {}).get("report", {
+                        "root": item["path"], "mode": "session", "staged": False,
+                        "changed": [], "executions": [], "findings": [], "exit_code": 0,
+                        "status": "skipped_no_changes", "ai_review": "not_run"})
+                    scope_warnings = list(dict.fromkeys(state.get("warnings", []) + report.get("scope_warnings", [])))
+                    if state["pending"]:
+                        scope_warnings.append("有写入调用尚未收到完成事件，后台任务和未完成调用不计入本次检查")
+                    message, block = feedback.prepare(state, report, scope_warnings, event_name,
+                                                     bool(event.get("stop_hook_active", event.get("stopHookActive"))), state_file)
+                    if message:
+                        messages.append(message)
+                    should_block |= block
+                    state["stop_seen"], state["feedback_pending"] = True, False
+                    state["pending_notice"] = sorted(state["pending"])
+                    state["cache"] = {"report": report}
+                    storage.save_artifact(state_file, state)
+                    if report.get("status") == "skipped_no_changes" and event.get("cwd") and Path(
+                            event["cwd"]).resolve().is_relative_to(Path(item["path"]).resolve()):
+                        storage.save_artifact(home() / "reports" / (item["id"] + ".json"), report)
+                    continue
+                snap, scope_warnings = sessions.scoped_snapshot(item, state, incremental=True)
                 warnings.extend(item["path"] + "：" + w for w in scope_warnings)
                 if snap is None:
                     # Keep an honest latest result: skipped is distinct from a passed check.
@@ -409,6 +432,17 @@ def do_hook(args):
                               "status": "scope_unavailable" if scope_warnings else "skipped_no_changes",
                               "scope_warnings": scope_warnings, "ai_review": "not_run"}
                     if state is not None:
+                        # Missing attribution is not a clean result. Keep earlier open
+                        # findings even when this event cannot produce a new snapshot.
+                        previous = state.get("cache", {}).get("report")
+                        if previous:
+                            report.update({"findings": previous["findings"],
+                                           "exit_code": previous["exit_code"]})
+                        state["changes"] = {}
+                        state["feedback_pending"] = event_name != "Stop"
+                        state["stop_seen"] = event_name == "Stop" or state.get("stop_seen", False)
+                        if event_name == "Stop":
+                            state["pending_notice"] = sorted(state["pending"])
                         state["cache"] = {"report": report}
                         message, block = feedback.prepare(state, report, scope_warnings, event_name,
                                                          bool(event.get("stop_hook_active", event.get("stopHookActive"))), state_file)
@@ -424,20 +458,23 @@ def do_hook(args):
                         storage.save_artifact(home() / "reports" / (item["id"] + ".json"), report)
                     continue
                 snap.scope["key"] = key
-                attach_references(snap, item["profile"])
-                cache_key = snap.fingerprint() + implementation_fingerprint(effective_profile(item["profile"], snap))
-                last = state.get("cache", {})
-                if last.get("key") == cache_key:
-                    report = last["report"]
-                else:
-                    report = run_checks(snap, item)
+                profile = effective_profile(item["profile"], snap)
+                attach_references(snap, profile)
+                policy_key = daily.prepare(snap, state, profile, implementation_fingerprint(profile))
+                report = run_checks(snap, item)
+                if snap.scope["unconfirmed_files"]:
+                    scope_warnings.append("此前检查文件已被其他操作修改，旧结果未复用为通过：" +
+                                          "、".join(snap.scope["unconfirmed_files"]))
                 report["scope_warnings"] = scope_warnings
-                state["cache"] = {"key": cache_key, "report": report}
+                report = daily.finish(snap, state, report, profile, policy_key)
                 message, block = feedback.prepare(state, report, scope_warnings, event_name,
                                                  bool(event.get("stop_hook_active", event.get("stopHookActive"))), state_file)
                 if message:
                     messages.append(message)
                 should_block |= block
+                if event_name == "Stop":
+                    state["stop_seen"], state["feedback_pending"] = True, False
+                    state["pending_notice"] = sorted(state["pending"])
                 storage.save_artifact(state_file, state)
                 storage.save_artifact(home() / "reports" / (item["id"] + ".json"), report)
                 checked.append(item["id"])

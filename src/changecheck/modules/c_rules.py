@@ -10,7 +10,7 @@ def masked(text):
     return TOKEN.sub(lambda m: re.sub(r"[^\n]", " ", m.group()), text)
 
 
-def check(name, text):
+def check(name, text, indentation_lines=None):
     findings = []
     def add(rule, message, offset=0, severity="ERROR"):
         findings.append({"file": name, "line": text.count("\n", 0, offset) + 1,
@@ -34,7 +34,10 @@ def check(name, text):
     for i in stack:
         add("C099", "未闭合结构或条件编译分支；必须由项目编译器核对", tokens[i][1], "REVIEW")
     offset = 0
-    for line in text.splitlines(True):
+    for number, line in enumerate(text.splitlines(True), 1):
+        if indentation_lines is not None and number not in indentation_lines:
+            offset += len(line)
+            continue
         stripped = line.lstrip(" \t")
         if "\t" in line:
             add("C001", "使用 4 空格缩进，禁止 Tab", offset)

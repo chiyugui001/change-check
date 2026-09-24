@@ -94,7 +94,8 @@ def run_checks(snap, item, selected_module=None):
               "stage": "commit" if snap.staged else "edit",
               "ai_review": "not_run",
               "mermaid_rendering": "not_run"}
-    save_artifact(home() / "reports" / (item["id"] + ".json"), report)
+    if not snap.delta:
+        save_artifact(home() / "reports" / (item["id"] + ".json"), report)
     return report
 
 

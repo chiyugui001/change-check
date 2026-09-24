@@ -32,7 +32,7 @@ def state_path(item, key):
 
 def new_state(agent):
     return {"format": 1, "agent": agent, "files": {}, "pending": {}, "uncertain": [],
-            "warnings": [], "started": time.time()}
+            "warnings": [], "changes": {}, "started": time.time()}
 
 
 def tool_scope(event):
@@ -148,7 +148,11 @@ def track(item, agent, event):
         save_artifact(path, state or new_state(agent))  # resume/compact retain the ledger
         return state, path, False
     if name == "Stop":
-        return state, path, True
+        # Stop is emitted after questions too. Never inspect files just to rediscover
+        # an unchanged report; a pending summary is rendered by the caller from state.
+        return state, path, bool(state and (state.get("changes") or state.get("feedback_pending")
+                                           or sorted(state["pending"]) != state.get("pending_notice", [])
+                                           or (not state.get("cache") and not state.get("stop_seen"))))
     paths = tool_scope(event)
     if paths == []:
         return state, path, False
@@ -160,6 +164,7 @@ def track(item, agent, event):
     call = field(event, "tool_use_id", "toolUseId")
     if not isinstance(call, str) or not call:
         state["warnings"] = sorted(set(state["warnings"]) | {"事件缺少工具调用编号，无法配对写入"})
+        state["feedback_pending"] = True
         save_artifact(path, state)
         return state, path, name != "PreToolUse"
     call = digest(call)
@@ -182,17 +187,21 @@ def track(item, agent, event):
         if call in state.get("completed", []):
             return state, path, False
         state["warnings"] = sorted(set(state["warnings"]) | {"缺少执行前基线，未扩大到仓库历史变动"})
+        state["feedback_pending"] = True
         save_artifact(path, state)
         return state, path, True
     tool_input = field(event, "tool_input", "toolInput") or {}
     if isinstance(tool_input, dict) and tool_input.get("run_in_background"):
         state["warnings"] = sorted(set(state["warnings"]) | {
             "后台命令返回不代表写入结束；其变化未归入本会话，请完成后手动检查并通过提交门禁"})
+        state["feedback_pending"] = True
         save_artifact(path, state)
         return state, path, True
     after = capture(root, pending["paths"], bodies=False)
     changed = [n for n in set(after) | set(pending["before"])
                if after.get(n, {}).get("hash") != pending["before"].get(n, {}).get("hash")]
+    if changed:
+        state["feedback_pending"] = True
     for n in changed:
         before = pending["before"].get(n, {"hash": None})
         value = after.get(n, {}).get("hash")
@@ -202,6 +211,11 @@ def track(item, agent, event):
             state["uncertain"] = sorted(set(state["uncertain"]) | {n})
             continue
         baseline = old["before"] if old else before
+        changes = state.setdefault("changes", {})
+        checkpoint = state.get("checkpoints", {}).get(n)
+        previous = changes.get(n, {}).get("before", checkpoint or before)
+        changes[n] = {"before": previous, "after": value,
+                      "method": "tool_delta" if paths is None else "explicit_path"}
         if baseline["hash"] == value:
             state["files"].pop(n, None)  # restored to this session's starting content
         else:
@@ -212,7 +226,7 @@ def track(item, agent, event):
     return state, path, bool(changed or state["warnings"])
 
 
-def scoped_snapshot(item, state):
+def scoped_snapshot(item, state, incremental=False):
     """Never substitute a full Git diff for missing/ambiguous session evidence."""
     warnings = list(state.get("warnings", [])) if state else ["没有本会话跟踪记录，请新开会话启用钩子"]
     if not state:
@@ -220,14 +234,15 @@ def scoped_snapshot(item, state):
     if state["pending"]:
         warnings.append("有写入调用尚未收到完成事件，后台任务和未完成调用不计入本次检查")
     root = Path(item["path"]).resolve()
-    current = capture(root, sorted(state["files"]), bodies=False)
+    records = state.get("changes", {}) if incremental else state["files"]
+    current = capture(root, sorted(records), bodies=False)
     names = set()
     uncertain = set(state["uncertain"])
-    for name, value in state["files"].items():
+    for name, value in records.items():
         actual = current.get(name, {}).get("hash")
         if actual != value["after"]:
             uncertain.add(name)
-        elif name not in uncertain:
+        elif name not in uncertain and (not incremental or actual != value["before"]["hash"]):
             names.add(name)
     if uncertain:
         warnings.append("以下文件并发写入或随后被其他操作改动，归属不明，未算作本会话修改：" +
@@ -235,13 +250,13 @@ def scoped_snapshot(item, state):
     if not names:
         return None, warnings
     snap = load_snapshot(root, changed_files=names)
-    snap.before = {n: base64.b64decode(state["files"][n]["before"]["body"])
-                   for n in names if "body" in state["files"][n]["before"]}
+    snap.before = {n: base64.b64decode(records[n]["before"]["body"])
+                   for n in names if "body" in records[n]["before"]}
     snap.scope = {"kind": "session", "agent": state["agent"],
-                  "methods": sorted({state["files"][n]["method"] for n in names})}
+                  "methods": sorted({records[n]["method"] for n in names})}
     # A race between attribution and snapshot creation must not check someone else's edit.
     verified = capture(root, sorted(names), bodies=False)
-    if any(verified.get(n, {}).get("hash") != state["files"][n]["after"] or
-           (n in snap.data and digest(snap.data[n]) != state["files"][n]["after"]) for n in names):
+    if any(verified.get(n, {}).get("hash") != records[n]["after"] or
+           (n in snap.data and digest(snap.data[n]) != records[n]["after"]) for n in names):
         raise CheckError("捕获会话检查输入期间文件变化，请重试")
     return snap, warnings

@@ -27,6 +27,8 @@ class Snapshot:
     captured: bool = False
     full_scan: bool = False
     scope: dict = field(default_factory=dict)
+    delta: dict = field(default_factory=dict)
+    checked_links: list = field(default_factory=list)
 
     def text(self, name):
         try:
