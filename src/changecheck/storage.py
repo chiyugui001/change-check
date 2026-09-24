@@ -9,12 +9,14 @@ from pathlib import Path
 
 from .common import CheckError, digest, home, lock, read_json, save_json
 
-DEFAULTS = {"days": 30, "review_limit": 100, "backup_limit": 3, "max_mib": 200}
+DEFAULTS = {"days": 30, "review_limit": 100, "backup_limit": 3, "max_mib": 200,
+            "session_limit": 100}
 PATTERNS = {
     "reports": r"[a-f0-9]{12}(?:-(?:staged|worktree)-review)?\.json",
     "reviews": r"[a-f0-9]{12}/(?:staged|worktree)/[a-f0-9]{64}\.json",
     "hook-cache": r"[a-f0-9]{12}\.json",
     "backups": r"[a-f0-9]{12}-[0-9]+\.(?:json|toml)",
+    "sessions": r"[a-f0-9]{12}/[a-f0-9]{64}\.json",
 }
 
 
@@ -50,7 +52,7 @@ def artifacts():
                 if not resolved.is_relative_to(base):
                     raise CheckError("存储路径越出状态目录：" + str(path))
                 stat = path.stat()
-                group = (path.parent.relative_to(base).as_posix() if category == "reviews"
+                group = (path.parent.relative_to(base).as_posix() if category in ("reviews", "sessions")
                          else name.split("-", 1)[0] if category == "backups" else category)
                 result.append({"path": path, "category": category, "group": group,
                                "size": stat.st_size, "mtime": stat.st_mtime})
@@ -66,9 +68,9 @@ def cleanup_locked(dry_run=False):
         category = entry["category"]
         key = (category, entry["group"])
         count = groups.get(key, 0)
-        limit = config["review_limit"] if category == "reviews" else config["backup_limit"]
+        limit = config[{"reviews": "review_limit", "sessions": "session_limit"}.get(category, "backup_limit")]
         expired = entry["mtime"] < cutoff
-        excess = category in ("reviews", "backups") and count >= limit
+        excess = category in ("reviews", "backups", "sessions") and count >= limit
         if expired or excess:
             selected.append({**entry, "reason": "expired" if expired else "count"})
         else:

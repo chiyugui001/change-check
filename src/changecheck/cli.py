@@ -17,7 +17,7 @@ from .repository import load_snapshot, repo_root
 from .review import (claude_command, codex_command, review_cache_enabled, reviewer_identity,
                      review_snapshot, validate_reviewer)
 from .context import attach_references
-from . import storage
+from . import sessions, storage
 from .project import CONFIG, FIELDS, MODULES, effective_profile, module_for, validate
 from .resources import complete_profile, require_resources, resource_issues, set_resource
 
@@ -383,31 +383,65 @@ def do_hook(args):
             raise CheckError("事件必须是对象")
         event_name = event.get("hook_event_name", event.get("hookEventName", "PostToolUse"))
         messages, checked = [], []
-        # All registered roots are examined: shell writes may target a different cwd.
+        warnings = []
+        key = sessions.session_key(args.agent, event)
+        if not key:
+            record_event(args.agent, event_name, [], scope="unavailable", outcome="missing_session_id")
+            print(json.dumps({"systemMessage": "会话检查已跳过：事件缺少 session_id；未扫描仓库历史变动，请新开会话启用钩子。"}, ensure_ascii=False))
+            return 0
         for item in roots():
             if args.agent not in item["profile"].get("agents", []):
                 continue
             with lock(item["id"], seconds=5):
-                snap = load_snapshot(item["path"])
+                state, state_file, should_check = sessions.track(item, args.agent, event)
+                if not should_check:
+                    continue
+                snap, scope_warnings = sessions.scoped_snapshot(item, state)
+                warnings.extend(item["path"] + "：" + w for w in scope_warnings)
+                if snap is None:
+                    # Keep an honest latest result: skipped is distinct from a passed check.
+                    report = {"root": item["path"], "mode": "session", "staged": False,
+                              "scope": {"kind": "session", "agent": args.agent, "key": key},
+                              "changed": [], "executions": [], "findings": [], "exit_code": 0,
+                              "status": "scope_unavailable" if scope_warnings else "skipped_no_changes",
+                              "scope_warnings": scope_warnings, "ai_review": "not_run"}
+                    if state is not None:
+                        state["cache"] = {"report": report}
+                        storage.save_artifact(state_file, state)
+                    # A root unrelated to the host cwd must not overwrite its previous report.
+                    if ((state is not None and (state["files"] or state["warnings"] or state["uncertain"])) or
+                            (event.get("cwd") and Path(event["cwd"]).resolve().is_relative_to(Path(item["path"]).resolve()))):
+                        storage.save_artifact(home() / "reports" / (item["id"] + ".json"), report)
+                    continue
+                snap.scope["key"] = key
                 attach_references(snap, item["profile"])
-                key = snap.fingerprint() + implementation_fingerprint(effective_profile(item["profile"], snap))
-                last_file = home() / "hook-cache" / (item["id"] + ".json")
-                last = read_json(last_file, {})
-                if last.get("key") == key:
+                cache_key = snap.fingerprint() + implementation_fingerprint(effective_profile(item["profile"], snap))
+                last = state.get("cache", {})
+                if last.get("key") == cache_key:
                     report = last["report"]
                 else:
                     report = run_checks(snap, item)
-                    storage.save_artifact(last_file, {"key": key, "report": report})
+                report["scope_warnings"] = scope_warnings
+                state["cache"] = {"key": cache_key, "report": report}
+                storage.save_artifact(state_file, state)
+                storage.save_artifact(home() / "reports" / (item["id"] + ".json"), report)
                 checked.append(item["id"])
                 for finding in report["findings"]:
                     if finding["severity"] in ("ERROR", "REVIEW"):
                         messages.append(f"{item['path']}/{finding['file']}:{finding['line']} "
                                         f"{finding['severity']} {finding['rule']}: {finding['message']}")
-        record_event(args.agent, event_name, checked)
+        record_event(args.agent, event_name, checked, scope="session", session_key=key,
+                     outcome="checked" if checked else "scope_unavailable" if warnings else "tracked_or_skipped")
         if not messages:
-            print("{}")
+            if warnings:
+                message = "会话范围提示（未扩大为全仓检查）：\n" + "\n".join(warnings[:10])
+                print(message if args.agent == "kimi" else json.dumps({"systemMessage": message}, ensure_ascii=False))
+            else:
+                print("{}" if args.agent != "kimi" else "")
             return 0
-        message = "变更检查待处理；只修正当前任务已授权范围，其他任务变动仅报告：\n" + "\n".join(messages[:60])
+        message = "本会话修改文件的脚本检查待处理；仅修正本任务已授权内容：\n" + "\n".join(messages[:60])
+        if warnings:
+            message += "\n会话范围提示：\n" + "\n".join(warnings[:10])
         if len(messages) > 60:
             message += "\n更多问题见本机 change-check/reports，不表示检查通过。"
         if args.agent == "kimi":

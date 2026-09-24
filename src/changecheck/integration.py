@@ -15,6 +15,12 @@ from .repository import repo_root
 from .storage import backup_config
 
 MARK = "change-check-managed"
+SESSION_EVENTS = ("SessionStart", "PreToolUse", "PostToolUse", "Stop")
+
+
+def hook_events(agent):
+    # Codex reports failed shell commands through PostToolUse, not a failure event.
+    return SESSION_EVENTS if agent == "codex" else (*SESSION_EVENTS, "PostToolUseFailure")
 
 
 def config_path(agent):
@@ -122,7 +128,7 @@ def _configure_agent(agent, remove=False):
         entries = [dict(e) for e in document.get("hooks", []) if not managed(e)]
         if not remove:
             entries.extend({"event": event, "command": command_string(agent), "timeout": 120}
-                           for event in ("PostToolUse", "Stop"))
+                           for event in hook_events(agent))
         array = tomlkit.aot()
         for entry in entries:
             array.append(tomlkit.item(entry))
@@ -140,7 +146,7 @@ def _configure_agent(agent, remove=False):
             events = holder.setdefault("events", {})
         else:
             events = holder
-        for event in ("PostToolUse", "Stop"):
+        for event in hook_events(agent):
             entries = events.get(event, [])
             if not isinstance(entries, list):
                 raise CheckError(f"{path} 中 {event} 不是数组")
@@ -242,9 +248,9 @@ def uninstall_git_hook(item):
     update_root(item)
 
 
-def record_event(agent, event, checked_roots):
+def record_event(agent, event, checked_roots, **details):
     with lock("events"):
         state = read_json(home() / "events.json", {})
         state[agent] = {"event": event, "roots": checked_roots, "time": time.time(),
-                        "state": "已收到事件调用；是否来自真实宿主须结合实测确认"}
+                        "state": "已收到事件调用；是否来自真实宿主须结合实测确认", **details}
         save_json(home() / "events.json", state)

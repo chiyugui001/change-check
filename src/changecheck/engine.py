@@ -71,7 +71,8 @@ def run_checks(snap, item, selected_module=None):
             raise CheckError("脚本检查期间暂存区或 HEAD 变化，必须重试")
     elif snap.captured:
         from .repository import load_snapshot
-        current = load_snapshot(snap.root, all_files=snap.full_scan)
+        current = load_snapshot(snap.root, all_files=snap.full_scan,
+                                changed_files=snap.changed if snap.scope else None)
         original = {n: value for n, value in snap.identities.items() if n not in snap.external}
         if current.head != snap.head or current.names != snap.names - snap.external.keys() or current.identities != original:
             raise CheckError("脚本检查期间工作区输入变化，必须重试")
@@ -83,7 +84,8 @@ def run_checks(snap, item, selected_module=None):
     findings = sorted(unique.values(), key=lambda f: (f["file"], f["line"], f["rule"]))
     status = 1 if any(f["severity"] in ("ERROR", "REVIEW") for f in findings) else 0
     report = {"root": str(snap.root), "staged": snap.staged,
-              "mode": "staged" if snap.staged else "worktree",
+              "mode": "staged" if snap.staged else "session" if snap.scope else "worktree",
+              "scope": snap.scope,
               "snapshot": snap.fingerprint(), "implementation": start_fingerprint,
               "changed": sorted(snap.changed), "executions": executions,
               "findings": findings, "exit_code": status,

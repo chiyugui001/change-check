@@ -26,6 +26,7 @@ class Snapshot:
     modes: dict = field(default_factory=dict)
     captured: bool = False
     full_scan: bool = False
+    scope: dict = field(default_factory=dict)
 
     def text(self, name):
         try:
@@ -46,7 +47,8 @@ class Snapshot:
         return digest({"mode": "staged" if self.staged else "worktree",
                        "head": self.head, "tree": self.tree, "files": self.identities,
                        "names": sorted(self.names), "changed": sorted(self.changed),
-                       "external": self.external})
+                       "external": self.external, "scope": self.scope,
+                       "before": {n: digest(raw) for n, raw in self.before.items()}})
 
 
 def is_text(name):
@@ -66,7 +68,7 @@ def index_identity(root):
     return tree, head.stdout.decode().strip() if head.returncode == 0 else ""
 
 
-def load_snapshot(root, staged=False, all_files=False):
+def load_snapshot(root, staged=False, all_files=False, changed_files=None):
     root = Path(root).resolve()
     snap = Snapshot(root, staged)
     snap.captured = True
@@ -122,6 +124,10 @@ def load_snapshot(root, staged=False, all_files=False):
             snap.changed = set(snap.names)
     if all_files:
         snap.changed.update(snap.names)
+    if changed_files is not None:
+        if staged:
+            raise CheckError("会话文件范围不能覆盖 Git 暂存范围")
+        snap.changed = set(changed_files)
     if not staged:
         # Non-text bodies are not model input, but changed attachments must still
         # invalidate a worktree review even when the filename remains unchanged.

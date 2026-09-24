@@ -812,6 +812,16 @@ class ReviewerSettings(Fixture):
 
 
 class Hooks(Fixture):
+    def tracked_edit(self, agent):
+        for event in ("PreToolUse", "PostToolUse"):
+            if event == "PostToolUse":
+                self.change("# 文档\n[[缺失]]\n", staged=False)
+            payload = {"session_id": "fixture-session", "hook_event_name": event,
+                       "tool_use_id": "edit-1", "tool_name": "Edit", "cwd": str(self.root),
+                       "tool_input": {"file_path": str(self.root / "中文.md")}}
+            with patch("sys.stdin", io.StringIO(json.dumps(payload))), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(cli.main(["hook", "--agent", agent]), 0)
+
     def test_installer_and_uninstaller_in_isolated_home(self):
         if not (Path(self.item["profile"]["skill"]) / "scripts/validate_detailed_design_format.py").is_file():
             self.skipTest("详设技能未安装")
@@ -846,8 +856,8 @@ class Hooks(Fixture):
     def test_kimi_stop_uses_blocking_exit_code(self):
         self.item["profile"]["agents"] = ["kimi"]
         update_root(self.item)
-        self.change("# 文档\n[[缺失]]\n", staged=False)
-        with patch("sys.stdin", io.StringIO('{"hook_event_name":"Stop"}')), contextlib.redirect_stderr(io.StringIO()):
+        self.tracked_edit("kimi")
+        with patch("sys.stdin", io.StringIO('{"hook_event_name":"Stop","session_id":"fixture-session"}')), contextlib.redirect_stderr(io.StringIO()):
             self.assertEqual(cli.main(["hook", "--agent", "kimi"]), 2)
 
     def test_preserve_original_hook_and_restore_on_uninstall(self):
@@ -905,7 +915,7 @@ class Hooks(Fixture):
                     save_json(path, data)
                 integration.configure_agent(agent)
                 integration.configure_agent(agent)
-                self.assertEqual(path.read_text(encoding="utf-8").count(integration.MARK), 2)
+                self.assertEqual(path.read_text(encoding="utf-8").count(integration.MARK), len(integration.hook_events(agent)))
                 integration.configure_agent(agent, remove=True)
                 text = path.read_text(encoding="utf-8")
                 self.assertIn("keep-me", text)
@@ -915,9 +925,9 @@ class Hooks(Fixture):
     def test_hook_feedback_and_recursion_guard(self):
         self.item["profile"]["agents"] = ["codex"]
         update_root(self.item)
-        self.change("# 文档\n[[缺失]]\n", staged=False)
+        self.tracked_edit("codex")
         output = io.StringIO()
-        with patch("sys.stdin", io.StringIO('{"hook_event_name":"Stop"}')), contextlib.redirect_stdout(output):
+        with patch("sys.stdin", io.StringIO('{"hook_event_name":"Stop","session_id":"fixture-session"}')), contextlib.redirect_stdout(output):
             self.assertEqual(cli.main(["hook", "--agent", "codex"]), 0)
         self.assertEqual(json.loads(output.getvalue())["decision"], "block")
         with patch.dict(os.environ, {"CHANGE_CHECK_REVIEW": "1"}), patch("sys.stdin", io.StringIO("invalid")):

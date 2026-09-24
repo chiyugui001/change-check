@@ -1,6 +1,6 @@
 ---
 reviewed_by: AI-draft
-modified: 2026-09-24 17:35:38
+modified: 2026-09-24 18:04:55
 status: draft
 tags:
   - 变更校验
@@ -12,6 +12,8 @@ tags:
 项目仓库：[chiyugui001/change-check](https://github.com/chiyugui001/change-check)。
 
 检查代码、知识库、配置和普通文档的变动。日常执行脚本检查；提交前执行必检脚本和独立 AI 审查，支持按声明的文件或模块增量复用结果。按需运行，无需后台服务。
+
+AI 日常钩子只检查本会话修改的文件及必要关联；没有修改就跳过，已有未提交文件不会自动算入。升级后重新运行安装器并新开 AI 会话。手动 `--changed` 仍检查工作区全部变动，Git 提交检查完整暂存内容。
 
 ## 安装
 
